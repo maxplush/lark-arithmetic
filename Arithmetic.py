@@ -23,35 +23,6 @@ grammar = r"""
 parser = lark.Lark(grammar)
 
 
-grammar = r"""
-    start: sum
-
-    ?sum: product
-        | sum "+" product   -> add
-        | sum "-" product   -> sub
-
-    ?product: exp
-        | product "*" exp   -> mul
-        | product "/" exp   -> div
-        | product "%" exp   -> mod
-
-    ?exp: atom
-        | exp "**" atom     -> exp
-
-    ?atom: NUMBER           -> number
-        | paren             -> paren
-        | product paren     -> mul
-
-    paren: "(" sum ")"
-
-    NUMBER: /-?[0-9]+/
-
-    %import common.WS_INLINE
-    %ignore WS_INLINE
-"""
-parser = lark.Lark(grammar)
-
-
 class Interpreter(lark.visitors.Interpreter):
     '''
     Compute the value of the expression.
@@ -178,19 +149,6 @@ class Interpreter(lark.visitors.Interpreter):
     def paren(self, tree):
         return self.visit(tree.children[0])
 
-    def mod(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        return v0 % v1
-
-    def exp(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        if v1 >= 0:
-            return v0 ** v1
-        else:
-            return 0
-
 
 class Simplifier(lark.Transformer):
     '''
@@ -304,13 +262,6 @@ class Simplifier(lark.Transformer):
     def mul(self, xs):
         return xs[0] * xs[1]
 
-    def mod(self, xs):
-        return xs[0] % xs[1]
-
-    def exp(self, xs):
-        import math
-        return math.floor(xs[0] ** xs[1])
-
     def div(self, xs):
         return xs[0] // xs[1]
 
@@ -321,51 +272,6 @@ class Simplifier(lark.Transformer):
 ########################################
 # other transformations
 ########################################
-
-
-class _RemoveUnneededParentheses(lark.Transformer):
-    def add(self, xs):
-        for i in [0, 1]:
-            if xs[i].data == 'paren':
-                if xs[i].children[0].data in ['mul', 'div', 'add', 'sub']:
-                    xs[i] = xs[i].children[0]
-        return lark.Tree('add', xs)
-
-    def sub(self, xs):
-        for i in [0, 1]:
-            if xs[i].data == 'paren':
-                if xs[i].children[0].data in ['mul', 'div', 'add', 'sub']:
-                    xs[i] = xs[i].children[0]
-        return lark.Tree('sub', xs)
-
-    def paren(self, xs):
-        if xs[0].data in ['paren', 'number']:
-            return xs[0]
-        else:
-            return lark.Tree('paren', xs)
-
-
-class _TreeToString(lark.Transformer):
-    def number(self, xs):
-        return xs[0].value
-
-    def start(self, xs):
-        return xs[0]
-
-    def add(self, xs):
-        return xs[0] + "+" + xs[1]
-
-    def sub(self, xs):
-        return xs[0] + "-" + xs[1]
-
-    def mul(self, xs):
-        return xs[0] + "*" + xs[1]
-
-    def div(self, xs):
-        return xs[0] + "/" + xs[1]
-
-    def paren(self, xs):
-        return "(" + xs[0] + ")"
 
 
 def minify(expr):
@@ -417,9 +323,6 @@ def minify(expr):
     >>> minify("1 + (((2)*(3)) + 4 * ((5 + 6) - 7))")
     '1+2*3+4*(5+6-7)'
     '''
-    tree = parser.parse(expr)
-    tree = _RemoveUnneededParentheses().transform(tree)
-    return _TreeToString().transform(tree)
 
 
 def eval_rpn(expr):
@@ -472,29 +375,6 @@ def eval_rpn(expr):
     return stack[0]
 
 
-class _TreeToRPN(lark.Transformer):
-    def number(self, xs):
-        return xs[0].value
-
-    def start(self, xs):
-        return xs[0]
-
-    def add(self, xs):
-        return xs[0] + " " + xs[1] + " " + "+"
-
-    def sub(self, xs):
-        return xs[0] + " " + xs[1] + " " + "-"
-
-    def mul(self, xs):
-        return xs[0] + " " + xs[1] + " " + "*"
-
-    def div(self, xs):
-        return xs[0] + " " + xs[1] + " " + "/"
-
-    def paren(self, xs):
-        return xs[0]
-
-
 def infix_to_rpn(expr):
     '''
     This function takes an expression in standard infix notation and converts it into an expression in reverse polish notation.
@@ -522,5 +402,3 @@ def infix_to_rpn(expr):
     >>> infix_to_rpn('(1*2)+3+4*(5-6)')
     '1 2 * 3 + 4 5 6 - * +'
     '''
-    tree = parser.parse(expr)
-    return _TreeToRPN().transform(tree)
