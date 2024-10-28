@@ -24,4 +24,4 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: run tests
         run: |
-          python3 -m doctest *.py
+          python3 -m doctest --verbose *.py
