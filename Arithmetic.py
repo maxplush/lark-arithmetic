@@ -1,3 +1,8 @@
+'''
+This is a "simple" homework to practice parsing grammars and working with the resulting parse tree.
+'''
+
+
 import lark
 
 
@@ -29,6 +34,9 @@ class Interpreter(lark.visitors.Interpreter):
     The interpreter class processes nodes "top down",
     starting at the root and recursively evaluating subtrees.
 
+    FIXME:
+    Get all the test cases to pass.
+
     >>> interpreter = Interpreter()
     >>> interpreter.visit(parser.parse("1"))
     1
@@ -55,10 +63,9 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("((1*2+(3)*4))*(5-6)"))
     -14
 
-    FIXME:
-    The basic arithmetic above should all be implemented correctly.
-    The arithmetic below, however, is not.
-    Getting these test cases to pass will require modifying the grammar above and the code in the class below.
+    NOTE:
+    The grammar for the arithmetic above should all be implemented correctly.
+    The arithmetic expressions below, however, will require you to modify the grammar.
 
     Modular division:
 
@@ -120,34 +127,6 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("(1+2)(3(4))"))
     36
     '''
-    def start(self, tree):
-        return self.visit(tree.children[0])
-
-    def number(self, tree):
-        return int(tree.children[0].value)
-
-    def add(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        return v0 + v1
-
-    def sub(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        return v0 - v1
-
-    def mul(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        return v0 * v1
-
-    def div(self, tree):
-        v0 = self.visit(tree.children[0])
-        v1 = self.visit(tree.children[1])
-        return v0 // v1
-
-    def paren(self, tree):
-        return self.visit(tree.children[0])
 
 
 class Simplifier(lark.Transformer):
@@ -247,26 +226,6 @@ class Simplifier(lark.Transformer):
     >>> simplifier.transform(parser.parse("(1+2)(3(4))"))
     36
     '''
-    def start(self, xs):
-        return xs[0]
-
-    def number(self, xs):
-        return int(xs[0].value)
-
-    def add(self, xs):
-        return xs[0] + xs[1]
-
-    def sub(self, xs):
-        return xs[0] - xs[1]
-
-    def mul(self, xs):
-        return xs[0] * xs[1]
-
-    def div(self, xs):
-        return xs[0] // xs[1]
-
-    def paren(self, xs):
-        return xs[0]
 
 
 ########################################
@@ -325,6 +284,35 @@ def minify(expr):
     '''
 
 
+def infix_to_rpn(expr):
+    '''
+    This function takes an expression in standard infix notation and converts it into an expression in reverse polish notation.
+    This type of translation task is commonly done by first converting the input expression into an AST (i.e. by calling parser.parse),
+    and then simplifying the AST in a leaf-to-root manner (i.e. using the Transformer class).
+
+    HINT:
+    If you need help understanding reverse polish notation,
+    see the eval_rpn function.
+
+    >>> infix_to_rpn('1')
+    '1'
+    >>> infix_to_rpn('1+2')
+    '1 2 +'
+    >>> infix_to_rpn('1-2')
+    '1 2 -'
+    >>> infix_to_rpn('(1+2)*3')
+    '1 2 + 3 *'
+    >>> infix_to_rpn('1+2*3')
+    '1 2 3 * +'
+    >>> infix_to_rpn('1*2+3')
+    '1 2 * 3 +'
+    >>> infix_to_rpn('1*(2+3)')
+    '1 2 3 + *'
+    >>> infix_to_rpn('(1*2)+3+4*(5-6)')
+    '1 2 * 3 + 4 5 6 - * +'
+    '''
+
+
 def eval_rpn(expr):
     '''
     This function evaluates an expression written in RPN.
@@ -332,11 +320,14 @@ def eval_rpn(expr):
     RPN (Reverse Polish Notation) is an alternative syntax for arithmetic.
     It was widely used in the first scientific calculators because it is much easier to parse than standard infix notation.
     For example, parentheses are never needed to disambiguate order of operations.
+    Parsing of RPN is so easy, that it is usually done at the same time as evaluation without a separate parsing phase.
+    More complicated languages (like the infix language above) are basically always implemented with separate parsing/evaluation phases.
+
     You can find more details on wikipedia: <https://en.wikipedia.org/wiki/Reverse_Polish_notation>.
 
     NOTE:
     There is nothing to implement for this function,
-    it is only provided as a reference for understanding the infix_to_rpn function below.
+    it is only provided as a reference for understanding the infix_to_rpn function.
 
     >>> eval_rpn("1")
     1
@@ -373,32 +364,3 @@ def eval_rpn(expr):
             stack.append(operators[token](v1, v2))
     assert len(stack) == 1
     return stack[0]
-
-
-def infix_to_rpn(expr):
-    '''
-    This function takes an expression in standard infix notation and converts it into an expression in reverse polish notation.
-    This type of translation task is commonly done by first converting the input expression into an AST (i.e. by calling parser.parse),
-    and then simplifying the AST in a leaf-to-root manner (i.e. using the Transformer class).
-
-    HINT:
-    If you need help understanding reverse polish notation,
-    see the eval_rpn function.
-
-    >>> infix_to_rpn('1')
-    '1'
-    >>> infix_to_rpn('1+2')
-    '1 2 +'
-    >>> infix_to_rpn('1-2')
-    '1 2 -'
-    >>> infix_to_rpn('(1+2)*3')
-    '1 2 + 3 *'
-    >>> infix_to_rpn('1+2*3')
-    '1 2 3 * +'
-    >>> infix_to_rpn('1*2+3')
-    '1 2 * 3 +'
-    >>> infix_to_rpn('1*(2+3)')
-    '1 2 3 + *'
-    >>> infix_to_rpn('(1*2)+3+4*(5-6)')
-    '1 2 * 3 + 4 5 6 - * +'
-    '''
