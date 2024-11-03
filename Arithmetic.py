@@ -127,7 +127,23 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("(1+2)(3(4))"))
     36
     '''
-
+    
+# lark.Transformer is more limited than lark.vistor.Interperter
+# Transformer "interpets" the tree leafs -> root
+# # 1) no manually managing recursion
+# 2) amount of computation is very limited 
+# visit every node in tree exactly once 
+# Interperter "interpets" the tree from root -> leaf 
+# 1) must manually mange recursion
+# 2) depending on how you managet hat recursion 
+# you can do a lot of "extra computation"
+# able to "compute" control flow like if statemtns for loops and function calls
+#
+# Interpeter strictly more powerful # anything a Transformer can do a Interperter can also do 
+#
+# One of the defining charactersitcs fo a "senior dev" / "good dev"
+# using the right level of power for a task
+# expliclty limiting your power is somteims good
 
 class Simplifier(lark.Transformer):
     '''
