@@ -1,8 +1,3 @@
-'''
-This is a "simple" homework to practice parsing grammars and working with the resulting parse tree.
-'''
-
-
 import lark
 
 
@@ -13,14 +8,19 @@ grammar = r"""
         | sum "+" product   -> add
         | sum "-" product   -> sub
 
-    ?product: atom
-        | product "*" atom  -> mul
-        | product "/" atom  -> div
+    ?product: expo
+        | product "*" expo  -> mul
+        | product "/" expo  -> div
+        | product "%" expo  -> mod
+        | product "(" sum ")"  -> parenmul
+
+    ?expo: atom
+        | expo "**" atom  -> expo
 
     ?atom: NUMBER           -> number
-        | "(" sum ")"       -> paren
+        | "(" sum ")"       
 
-    NUMBER: /-?[0-9]+/
+    NUMBER: /-?[0-9]+/      
 
     %import common.WS_INLINE
     %ignore WS_INLINE
@@ -34,14 +34,14 @@ class Interpreter(lark.visitors.Interpreter):
     The interpreter class processes nodes "top down",
     starting at the root and recursively evaluating subtrees.
 
-    FIXME:
-    Get all the test cases to pass.
 
     >>> interpreter = Interpreter()
     >>> interpreter.visit(parser.parse("1"))
     1
     >>> interpreter.visit(parser.parse("-1"))
     -1
+    >>> interpreter.visit(parser.parse("((1))"))
+    1
     >>> interpreter.visit(parser.parse("1+2"))
     3
     >>> interpreter.visit(parser.parse("1-2"))
@@ -63,9 +63,7 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("((1*2+(3)*4))*(5-6)"))
     -14
 
-    NOTE:
-    The grammar for the arithmetic above should all be implemented correctly.
-    The arithmetic expressions below, however, will require you to modify the grammar.
+    
 
     Modular division:
 
@@ -95,11 +93,7 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("(1+2)**3-4"))
     23
 
-    NOTE:
-    The calculator is designed to only work on integers.
-    Division uses integer division,
-    and exponentiation should use integer exponentiation when the exponent is negative.
-    (That is, it should round the fraction down to zero.)
+    
 
     >>> interpreter.visit(parser.parse("2**-1"))
     0
@@ -127,23 +121,38 @@ class Interpreter(lark.visitors.Interpreter):
     >>> interpreter.visit(parser.parse("(1+2)(3(4))"))
     36
     '''
-    
-# lark.Transformer is more limited than lark.vistor.Interperter
-# Transformer "interpets" the tree leafs -> root
-# # 1) no manually managing recursion
-# 2) amount of computation is very limited 
-# visit every node in tree exactly once 
-# Interperter "interpets" the tree from root -> leaf 
-# 1) must manually mange recursion
-# 2) depending on how you managet hat recursion 
-# you can do a lot of "extra computation"
-# able to "compute" control flow like if statemtns for loops and function calls
-#
-# Interpeter strictly more powerful # anything a Transformer can do a Interperter can also do 
-#
-# One of the defining charactersitcs fo a "senior dev" / "good dev"
-# using the right level of power for a task
-# expliclty limiting your power is somteims good
+    def start(self, tree):
+        return self.visit(tree.children[0])
+    def add(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return v0 + v1
+    def sub(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return v0 - v1
+    def mul(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return v0 * v1
+    def div(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return round(v0 / v1)
+    def mod(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return round(v0 % v1)
+    def parenmul(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return v0 * v1
+    def expo(self, tree):
+        v0 = self.visit(tree.children[0])
+        v1 = self.visit(tree.children[1])
+        return round(v0 ** v1)
+    def number(self, tree):
+        return int(tree.children[0].value)
 
 class Simplifier(lark.Transformer):
     '''
@@ -154,11 +163,6 @@ class Simplifier(lark.Transformer):
     But in the case of simple arithmetic expressions,
     both classes can be used to evaluate the expression.
 
-    FIXME:
-    This class contains all of the same test cases as the Interpreter class.
-    You should fix all the failing test cases.
-    You shouldn't need to make any additional modifications to the grammar beyond what was needed for the interpreter class.
-    You should notice that the functions in the lark.Transformer class are simpler to implement because you do not have to manage the recursion yourself.
 
     >>> simplifier = Simplifier()
     >>> simplifier.transform(parser.parse("1"))
@@ -242,6 +246,24 @@ class Simplifier(lark.Transformer):
     >>> simplifier.transform(parser.parse("(1+2)(3(4))"))
     36
     '''
+    def start(self, children):
+        return children[0]
+    def add(self, children):
+        return children[0] + children[1]
+    def sub(self, children):
+        return children[0] - children[1]
+    def mul(self, children):
+        return children[0] * children[1]
+    def div(self, children):
+        return round(children[0]/children[1])
+    def mod(self, children):
+        return round(children[0] % children[1])
+    def parenmul(self, children):
+        return children[0] * children[1]
+    def expo(self, children):
+        return round(children[0] ** children[1])
+    def number(self, children):
+        return int(children[0].value)
 
 
 ########################################
@@ -256,24 +278,7 @@ def minify(expr):
     It is common to minify code in order to save disk space and bandwidth.
     For example, google penalizes a web site's search ranking if they don't minify their html/javascript code.
 
-    FIXME:
-    Implement this function so that the test cases below pass.
 
-    HINT:
-    My solution uses two lark.Transformer classes.
-    The first one takes an AST and removes any unneeded parentheses.
-    The second taks an AST and converts the AST into a string.
-    You can solve this problem by calling parser.parse,
-    and then applying the two transformers above to the resulting AST.
-
-    NOTE:
-    It is important that these types of "syntactic" transformations use the Transformer class and not the Interpreter class.
-    If we used the Interpreter class, we could "accidentally do too much computation",
-    but the Transformer class's leaf-to-root workflow prevents this class of bug.
-
-    NOTE:
-    The test cases below do not require any of the "new" features that you are required to add to the Arithmetic grammar.
-    It only uses the features in the starting code.
 
     >>> minify("1 + 2")
     '1+2'
@@ -298,17 +303,65 @@ def minify(expr):
     >>> minify("1 + (((2)*(3)) + 4 * ((5 + 6) - 7))")
     '1+2*3+4*(5+6-7)'
     '''
+    from lark import Lark, Transformer
+    class Simplifier(Transformer):
+        def start(self, children):
+            return children[0]
+        
+        def add(self, children):
+            return f"{children[0]}+{children[1]}"
+        
+        def sub(self, children):
+            return f"{children[0]}-{children[1]}"
+        
+        def mul(self, children):
+            left, right = children
+            if isinstance(left, str) and '+' in left or '-' in left:
+                left = f"({left})"
+            if isinstance(right, str) and '+' in right or '-' in right:
+                right = f"({right})"
+            return f"{left}*{right}"
+        
+        def div(self, children):
+            left, right = children
+            if isinstance(left, str) and '+' in left or '-' in left:
+                left = f"({left})"
+            if isinstance(right, str) and '+' in right or '-' in right:
+                right = f"({right})"
+            return f"{left}/{right}"
+        
+        def mod(self, children):
+            left, right = children
+            if isinstance(left, str) and '+' in left or '-' in left:
+                left = f"({left})"
+            if isinstance(right, str) and '+' in right or '-' in right:
+                right = f"({right})"
+            return f"{left}%{right}"
+        
+        def expo(self, children):
+            left, right = children
+            if isinstance(left, str) and '+' in left or '-' in left or '*' in left or '/' in left:
+                left = f"({left})"
+            if isinstance(right, str) and '+' in right or '-' in right or '*' in right or '/' in right:
+                right = f"({right})"
+            return f"{left}**{right}"
+        
+        def number(self, children):
+            return children[0].value
+        
+        def expr(self, children):
+            if len(children) == 1:
+                return children[0]
+            return f"({children[0]})"
 
+    parser = Lark(grammar, parser='lalr', transformer=Simplifier())
 
+    return parser.parse(expr)
 def infix_to_rpn(expr):
     '''
     This function takes an expression in standard infix notation and converts it into an expression in reverse polish notation.
     This type of translation task is commonly done by first converting the input expression into an AST (i.e. by calling parser.parse),
     and then simplifying the AST in a leaf-to-root manner (i.e. using the Transformer class).
-
-    HINT:
-    If you need help understanding reverse polish notation,
-    see the eval_rpn function.
 
     >>> infix_to_rpn('1')
     '1'
@@ -327,8 +380,27 @@ def infix_to_rpn(expr):
     >>> infix_to_rpn('(1*2)+3+4*(5-6)')
     '1 2 * 3 + 4 5 6 - * +'
     '''
-
-
+    class Interpreter(lark.visitors.Interpreter):
+        """
+        This will have the following methods
+        start
+        add
+        sub
+        mul
+        """
+        def start(self, tree):
+            return self.visit(tree.children[0])
+        def add(self, tree):
+            return self.visit(tree.children[0]) + " " + self.visit(tree.children[1]) + " +"
+        def sub(self, tree):
+            return self.visit(tree.children[0]) + " " + self.visit(tree.children[1]) + " -"
+        def mul(self, tree):
+            return self.visit(tree.children[0]) + " " + self.visit(tree.children[1]) + " *"
+        def number(self, tree):
+            return str(tree.children[0].value)
+    interpreter = Interpreter()
+    return interpreter.visit(parser.parse(expr))
+infix_to_rpn('1')
 def eval_rpn(expr):
     '''
     This function evaluates an expression written in RPN.
@@ -339,11 +411,7 @@ def eval_rpn(expr):
     Parsing of RPN is so easy, that it is usually done at the same time as evaluation without a separate parsing phase.
     More complicated languages (like the infix language above) are basically always implemented with separate parsing/evaluation phases.
 
-    You can find more details on wikipedia: <https://en.wikipedia.org/wiki/Reverse_Polish_notation>.
 
-    NOTE:
-    There is nothing to implement for this function,
-    it is only provided as a reference for understanding the infix_to_rpn function.
 
     >>> eval_rpn("1")
     1
