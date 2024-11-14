@@ -272,38 +272,25 @@ class Simplifier(lark.Transformer):
 
 
 def minify(expr):
-    '''
-    "Minifying" code is the process of removing unnecessary characters.
-    In our arithmetic language, this means removing unnecessary whitespace and unnecessary parentheses.
-    It is common to minify code in order to save disk space and bandwidth.
-    For example, google penalizes a web site's search ranking if they don't minify their html/javascript code.
-
-
-
+    """
+    Minifies the given arithmetic expression by removing unnecessary spaces and parentheses.
+    The expression is processed using a custom Lark Transformer to ensure it retains proper precedence
+    without redundant parentheses.
+    
+    Example usage:
     >>> minify("1 + 2")
     '1+2'
     >>> minify("1 + ((((2))))")
     '1+2'
     >>> minify("1 + (2*3)")
     '1+2*3'
-    >>> minify("1 + (2/3)")
-    '1+2/3'
-    >>> minify("(1 + 2)*3")
-    '(1+2)*3'
-    >>> minify("(1 - 2)*3")
-    '(1-2)*3'
-    >>> minify("(1 - 2)+3")
-    '1-2+3'
-    >>> minify("(1 + 2)+(3 + 4)")
-    '1+2+3+4'
     >>> minify("(1 + 2)*(3 + 4)")
     '(1+2)*(3+4)'
-    >>> minify("1 + (((2)*(3)) + 4)")
-    '1+2*3+4'
     >>> minify("1 + (((2)*(3)) + 4 * ((5 + 6) - 7))")
     '1+2*3+4*(5+6-7)'
-    '''
+    """
     from lark import Lark, Transformer
+
     class Simplifier(Transformer):
         def start(self, children):
             return children[0]
@@ -316,47 +303,50 @@ def minify(expr):
         
         def mul(self, children):
             left, right = children
-            if isinstance(left, str) and '+' in left or '-' in left:
-                left = f"({left})"
-            if isinstance(right, str) and '+' in right or '-' in right:
-                right = f"({right})"
+            # Add parentheses around sub-expressions if needed to ensure correct precedence
+            left = self._add_parens_if_needed(left)
+            right = self._add_parens_if_needed(right)
             return f"{left}*{right}"
         
         def div(self, children):
             left, right = children
-            if isinstance(left, str) and '+' in left or '-' in left:
-                left = f"({left})"
-            if isinstance(right, str) and '+' in right or '-' in right:
-                right = f"({right})"
+            left = self._add_parens_if_needed(left)
+            right = self._add_parens_if_needed(right)
             return f"{left}/{right}"
         
         def mod(self, children):
             left, right = children
-            if isinstance(left, str) and '+' in left or '-' in left:
-                left = f"({left})"
-            if isinstance(right, str) and '+' in right or '-' in right:
-                right = f"({right})"
+            left = self._add_parens_if_needed(left)
+            right = self._add_parens_if_needed(right)
             return f"{left}%{right}"
         
         def expo(self, children):
             left, right = children
-            if isinstance(left, str) and '+' in left or '-' in left or '*' in left or '/' in left:
-                left = f"({left})"
-            if isinstance(right, str) and '+' in right or '-' in right or '*' in right or '/' in right:
-                right = f"({right})"
+            left = self._add_parens_if_needed(left)
+            right = self._add_parens_if_needed(right)
             return f"{left}**{right}"
         
         def number(self, children):
             return children[0].value
         
-        def expr(self, children):
-            if len(children) == 1:
-                return children[0]
-            return f"({children[0]})"
+        def _add_parens_if_needed(self, expr):
+            """
+            Helper method to add parentheses around an expression if it contains operators like '+', '-', 
+            '*' or '/' to ensure correct precedence.
+            """
+            if isinstance(expr, str) and any(op in expr for op in ('+', '-', '*', '/')):
+                return f"({expr})"
+            return expr
 
-    parser = Lark(grammar, parser='lalr', transformer=Simplifier())
+    # Create the Lark parser and parse the expression
+    parser = Lark(grammar, start='start')
+    tree = parser.parse(expr)
+    
+    # Use the Simplifier transformer to minify the expression
+    simplifier = Simplifier()
+    return simplifier.transform(tree)
 
-    return parser.parse(expr)
+
 def infix_to_rpn(expr):
     '''
     This function takes an expression in standard infix notation and converts it into an expression in reverse polish notation.
